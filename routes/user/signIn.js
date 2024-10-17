@@ -1,7 +1,7 @@
 const authUtil = require("../../response/authUtil");
 const { Users } = require("../../models");
 const bcrypt = require("bcrypt");
-const jwt = require("jsonwebtoken"); // JWT를 사용하여 토큰 발급
+const jwt = require("jsonwebtoken");
 
 const SignIn = async (req, res) => {
   const { email, password } = req.body;
@@ -22,14 +22,23 @@ const SignIn = async (req, res) => {
         .send(authUtil.successFalse(401, "비밀번호가 일치하지 않습니다."));
     }
 
-    // JWT 토큰 발급
-    const token = jwt.sign({ id: user.id }, process.env.JWT_SECRET, {
-      expiresIn: "1h",
-    }); // 비밀 키와 만료 시간 설정
+    const accessToken = jwt.sign({ id: user.id }, process.env.JWT_SECRET, {
+      expiresIn: "15m",
+    });
 
-    return res
-      .status(200)
-      .send(authUtil.successTrue(200, "로그인 성공", { token }));
+    const refreshToken = jwt.sign({ id: user.id }, process.env.JWT_SECRET, {
+      expiresIn: "7d",
+    });
+
+    await Users.update({ refreshToken }, { where: { id: user.id } });
+
+    return res.status(200).send(
+      authUtil.successTrue(200, "로그인 성공", {
+        accessToken,
+        refreshToken,
+        username: user.username,
+      }),
+    );
   } catch (error) {
     console.error(error);
     return res.status(500).send(authUtil.unknownError({ error: error }));
